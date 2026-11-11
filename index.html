@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="MTB RUSH – 2D Mountainbike Racing im Browser">
+<title>MTB RUSH — Ride Beyond</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:#0b100d;color:#eef5ef;font-family:system-ui,-apple-system,Segoe UI,sans-serif;height:100%;overflow:hidden}
+body{display:grid;place-items:center}.wrap{width:min(1100px,100vw);height:100vh;display:grid;grid-template-rows:auto 1fr auto;background:#111812}
+header,footer{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:#0d140f;border-bottom:1px solid #26352a}footer{border:0;border-top:1px solid #26352a;font-size:12px;color:#91a295}
+.brand{font-weight:900;letter-spacing:2px;font-size:22px}.brand b{color:#8cf05a}.hud{display:flex;gap:14px;font-size:13px;color:#b8c7bb}.hud strong{color:#fff}
+main{position:relative;min-height:0}canvas{width:100%;height:100%;display:block;background:#87b9d6}.overlay{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}.card{pointer-events:auto;width:min(520px,92%);background:rgba(11,17,13,.92);border:1px solid #3a4b3d;border-radius:18px;padding:24px;box-shadow:0 20px 70px #0008}.card h1{margin:0 0 8px;font-size:34px}.card p{color:#b7c5ba;line-height:1.5}.buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}button{border:1px solid #506052;background:#1a251c;color:#fff;border-radius:10px;padding:11px 15px;font-weight:800;cursor:pointer}button.primary{background:#8cf05a;color:#0b140b;border-color:#8cf05a}button:active{transform:translateY(1px)}.hidden{display:none!important}
+.controls{position:absolute;inset:auto 12px 12px;display:flex;justify-content:space-between;pointer-events:none}.cluster{display:flex;gap:8px}.control{pointer-events:auto;width:58px;height:52px;border-radius:14px;background:#101812cc;border:1px solid #ffffff33;color:#fff;font-weight:900;touch-action:none}.wide{width:74px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}.stat{padding:10px;background:#182119;border-radius:10px;text-align:center}.stat small{display:block;color:#9aaa9f}.stat b{font-size:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div class="brand">MTB <b>RUSH</b></div><div class="hud"><span>CR <strong id="cr">0</strong></span><span>Level <strong id="level">1</strong></span><span>Best <strong id="best">0</strong> m</span></div></header>
+<main><canvas id="game"></canvas><div id="menu" class="overlay"><div class="card"><h1>Ride Beyond</h1><p>Fahr durch die Berge, springe über Kuppen und sammle Credits. <b>W/D/↑</b> Gas, <b>A/S/←/→</b> Neigen, <b>Leertaste</b> Bunny Hop.</p><div class="buttons"><button class="primary" id="start">Rennen starten</button><button id="shop">Garage</button></div><div id="garage" class="stats hidden"></div></div></div><div id="controls" class="controls hidden"><div class="cluster"><button class="control" data-k="left">◀</button><button class="control" data-k="right">▶</button></div><div class="cluster"><button class="control wide" data-k="brake">BRAKE</button><button class="control wide" data-k="gas">GO</button><button class="control wide" data-k="jump">JUMP</button></div></div></main>
+<footer><span>MTB RUSH · Browser Edition</span><span>Offline spielbar · Spielstand lokal gespeichert</span></footer>
+</div>
+<script>
+(()=>{const c=document.getElementById('game'),x=c.getContext('2d'),menu=document.getElementById('menu'),controls=document.getElementById('controls'),crEl=document.getElementById('cr'),lvEl=document.getElementById('level'),bestEl=document.getElementById('best'),garage=document.getElementById('garage');let W,H,dpr=1,running=false,last=0,dist=0,coins=0,best=+localStorage.mtbBest||0,credits=+localStorage.mtbCR||0,level=+localStorage.mtbLvl||1,px=130,py=0,vx=0,vy=0,angle=0,spin=0,seed=2,ground=[],keys={};let bike={speed:1,handling:1,jump:1};
+function resize(){dpr=Math.min(2,devicePixelRatio||1);W=c.clientWidth;H=c.clientHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0);makeGround()}addEventListener('resize',resize);
+function makeGround(){ground=[];for(let i=0;i<Math.ceil(W/12)+30;i++){let wx=i*12;let y=H*.72+Math.sin((wx+seed*90)*.012)*38+Math.sin(wx*.032)*20+Math.sin(wx*.006)*55;ground.push({x:wx,y})}}
+function gy(wx){let i=Math.floor(wx/12),a=ground[i],b=ground[i+1]||a;if(!a)return H*.72;let t=(wx-a.x)/12;return a.y+(b.y-a.y)*t}
+function save(){localStorage.mtbBest=best;localStorage.mtbCR=credits;localStorage.mtbLvl=level;crEl.textContent=credits;lvEl.textContent=level;bestEl.textContent=Math.floor(best)}
+function draw(){x.clearRect(0,0,W,H);let g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,'#8fc5df');g.addColorStop(1,'#d9e5c5');x.fillStyle=g;x.fillRect(0,0,W,H);
+for(let layer=0;layer<3;layer++){x.fillStyle=['#789a73','#5e7d5c','#3e5b43'][layer];x.beginPath();x.moveTo(0,H);for(let i=0;i<=W+30;i+=30)x.lineTo(i,H*.53+layer*42+Math.sin((i+dist*(.08+layer*.03))*.01)*25);x.lineTo(W,H);x.fill()}
+x.save();x.translate(-((dist*2)%W),0);x.fillStyle='#203a25';for(let k=-1;k<3;k++){x.beginPath();x.moveTo(k*W,H*.72);x.lineTo(k*W+W*.12,H*.58);x.lineTo(k*W+W*.24,H*.72);x.fill()}x.restore();
+x.save();x.translate(-dist*2,0);x.strokeStyle='#314b32';x.lineWidth=4;x.beginPath();for(let p of ground){if(p.x<dist-100||p.x>dist+W+100)continue;if(p===ground[0])x.moveTo(p.x,p.y);else x.lineTo(p.x,p.y)}x.stroke();x.fillStyle='#4f7d4d';x.beginPath();for(let p of ground){if(p.x<dist-100||p.x>dist+W+100)continue;if(p===ground[0])x.moveTo(p.x,p.y);else x.lineTo(p.x,p.y)}x.lineTo(dist+W+100,H);x.lineTo(dist-100,H);x.fill();x.restore();
+if(running){drawBike();x.fillStyle='#fff';x.font='700 15px system-ui';x.fillText(Math.floor(dist)+' m',18,28);x.fillText('+'+coins+' CR',18,50)}}
+function drawBike(){let sx=px,sy=py; x.save();x.translate(sx,sy);x.rotate(angle);x.strokeStyle='#141a16';x.lineWidth=5;x.lineCap='round';x.beginPath();x.arc(-24,14,16,0,7);x.stroke();x.beginPath();x.arc(24,14,16,0,7);x.stroke();x.strokeStyle='#8cf05a';x.lineWidth=4;x.beginPath();x.moveTo(-24,14);x.lineTo(0,-10);x.lineTo(24,14);x.lineTo(-8,14);x.lineTo(0,-10);x.stroke();x.strokeStyle='#e7efe8';x.lineWidth=3;x.beginPath();x.moveTo(0,-10);x.lineTo(4,-28);x.moveTo(4,-28);x.lineTo(18,-31);x.moveTo(0,-10);x.lineTo(-10,-17);x.stroke();x.fillStyle='#1a1d1a';x.beginPath();x.arc(3,-39,9,0,7);x.fill();x.restore()}
+function start(){running=true;menu.classList.add('hidden');controls.classList.remove('hidden');dist=0;coins=0;px=130;py=gy(dist+px)-16;vx=3;vy=0;angle=0;spin=0;last=performance.now();requestAnimationFrame(loop)}
+function finish(){running=false;controls.classList.add('hidden');if(dist>best)best=dist;credits+=coins+Math.floor(dist/50);level=1+Math.floor(credits/500);save();menu.classList.remove('hidden');menu.querySelector('h1').textContent='Run geschafft!';menu.querySelector('p').textContent='Deine Strecke: '+Math.floor(dist)+' m · Credits: '+(coins+Math.floor(dist/50));}
+function loop(t){if(!running)return;let dt=Math.min(.032,(t-last)/1000);last=t;let gas=keys.gas||keys.w||keys.ArrowUp,brake=keys.brake||keys.s||keys.ArrowDown,jump=keys.jump||keys[' '];vx+=(gas?.22:0)- (brake?.3:0);vx*=.992;vx=Math.max(1.2,Math.min(8,vx));dist+=vx*dt*12;let worldX=dist+px,groundY=gy(worldX);let target=groundY-16;let grounded=py>=target-3;if(grounded){py=target;vy=0;if(jump){vy=-7.5*bike.jump;keys.jump=false}angle+=(keys.left?-1:0)+(keys.right?1:0);angle*=.9}else{vy+=18*dt;py+=vy;angle+=((keys.left?-1:0)+(keys.right?1:0))*dt*4;spin+=vx*dt*2}
+if(py>H+80){finish();return}if(Math.random()<dt*.35){coins++;}draw();requestAnimationFrame(loop)}
+function renderGarage(){garage.innerHTML='<div class="stat"><small>Speed</small><b>'+bike.speed.toFixed(1)+'</b></div><div class="stat"><small>Handling</small><b>'+bike.handling.toFixed(1)+'</b></div><div class="stat"><small>Jump</small><b>'+bike.jump.toFixed(1)+'</b></div>';garage.classList.toggle('hidden')}
+addEventListener('keydown',e=>{keys[e.key]=true;if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault()});addEventListener('keyup',e=>keys[e.key]=false);
+document.getElementById('start').onclick=start;document.getElementById('shop').onclick=renderGarage;
+document.querySelectorAll('[data-k]').forEach(b=>{let k=b.dataset.k,down=e=>{e.preventDefault();keys[k]=true},up=e=>{e.preventDefault();keys[k]=false};b.addEventListener('pointerdown',down);b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('pointerleave',up)});
+save();resize();draw();
+})();
+</script>
+</body></html>
